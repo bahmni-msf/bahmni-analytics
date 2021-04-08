@@ -1,0 +1,77 @@
+name: Create Release
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [2.7]
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      mysql:
+        image: mysql:5.6
+        env:
+          MYSQL_ROOT_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+            python-version: ${{ matrix.python-version }}
+      - name: Create test_openmrs mysql database
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y mysql-client
+            mysql --host 127.0.0.1 --port 3306 -uroot -ppassword -e "SHOW DATABASES"
+            mysql --host 127.0.0.1 --port 3306 -uroot -ppassword -e "create database test_openmrs;"
+            mysql --host 127.0.0.1 --port 3306 -uroot -ppassword -e "CREATE USER 'test_user'@'127.0.0.1' IDENTIFIED BY 'password';"
+            mysql --host 127.0.0.1 --port 3306 -uroot -ppassword -e "GRANT ALL PRIVILEGES ON *.* TO 'test_user'@'%' IDENTIFIED by 'password';"
+            mysql --host 127.0.0.1 --port 3306 -uroot -ppassword -e "FLUSH PRIVILEGES;"
+
+
+      - name: Create test_analytics postgres database
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
+          - run: |
+          PGPASSWORD=password psql -h 127.0.0.1 --port 5432 -U postgres -c "CREATE USER test_user WITH PASSWORD 'password' NOCREATEROLE SUPERUSER;"
+          PGPASSWORD=password psql -h 127.0.0.1 --port 5432 -U postgres -c "CREATE DATABASE test_analytics WITH OWNER test_user;"
+          PGPASSWORD=password psql -h 127.0.0.1 --port 5432 -U test_user test_analytics -c "CREATE SCHEMA bahmni_mart_scdf;"
+
+      - name: chckout code
+        uses: actions/checkout@v2
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v1
+        with:
+            java-version: 1.8
+      - run: ./scripts/travis/compile.sh
+      - run: ./scripts/travis/test.sh
+      - run: ./scripts/travis/createRpm.sh
+      - shell: bash
+        env:
+          TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          ./scripts/github-release.sh bahmni "$TOKEN"
+
+
