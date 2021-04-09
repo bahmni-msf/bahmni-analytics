@@ -139,3 +139,41 @@ You can access **Bahmni-mart** and other application from browser also.
 
 ### Implementers Note
 For implementers note please check [here](https://docs.google.com/document/d/1NClHML9rabkS6KwXXUMOgLhJmo9kOvJkMTgewXLyPTo/edit?usp=sharing).
+### Bahmni Mart dev setup
+### To run bahmni-mart from IDE and debug the code please follow the below steps
+* Update ANALYTICS_DB_PASSWORD,  OPENMRS_DB_PASSWORD and vagrant IP in ```application-dev.properties```
+* Set VM options to ```"-Dspring.profiles.active=dev"``` in the run configurations in IDE
+* Replace conf/app.json, conf/extension.json, conf/bahmni-mart.json with respective implementation specific config file
+* Connect to both openmrs and analytics databases from IDE. Before that do below configurations to connect to respective databases
+    * Grant privileges from vagrant to be able to connect to openmrs db as root user
+    
+        ```mysql -uroot -ppassword openmrs```
+    
+        ```GRANT ALL PRIVILEGES ON openmrs.* to 'root'@'%' identified by 'password';```
+    
+        ```flush privileges;```
+    * Edit pg_hba.conf to be able to access analytics db from outside
+    
+        ``` vi /var/lib/pgsql/9.2/data/pg_hba.conf ```
+    
+        ``` host  all    all   192.168.33.11/0 trust ```
+    
+* Once connections to both db’s are successful run the application from IDE
+    
+### To run the Integration tests from IDE
+* Update ANALYTICS_DB_PASSWORD,  OPENMRS_DB_PASSWORD and vagrant IP in application-test.properties
+* Create below databases from inside vagrant 
+* mysqlTesytDb : (testMysql.sql) 
+
+    ```mysql -uroot -ppasword ```
+    
+    ```CREATE DATABASE IF NOT EXISTS test_openmrs;```
+    
+    ```CREATE USER 'test_user'@'%' IDENTIFIED BY 'password';```
+* psqlTestDb :  (psqlTestSetup.sql)
+
+    ```psql	-Uanalytics```
+    
+    ```CREATE USER test_user WITH PASSWORD 'password' NOCREATEROLE SUPERUSER;```
+    
+    ```CREATE DATABASE test_analytics WITH OWNER test_user;```
